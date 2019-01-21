@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+set -eu
+
+# Check input
+if [ "$#" = "0" ]; then
+  echo "ERROR: missing dwsh parameters"
+  exit 1
+fi
+
+# Return RC 0 to show it exists
+if [ "$#" = "1" ] && [ "$1" = "is-installed" ]; then
+  exit 0
+fi
+
+# Exit if shell environment already in DWSH
+if [ ! -z "${DWSH_ENV+x}" ] && [ "${DWSH_ENV}" = "1" ] ;then
+  exit 0;
+fi
+
+# Check if running in docker environment
+if [ -f /.dockerenv ]; then
+  echo "DWSH WARN: Already running in docker container"
+  exit 1
+fi
+
+# Check if docker daemon is running
+if ! docker ps >/dev/null 2>&1; then
+  echo "DWSH WARN: Docker daemon is not running on the machine"
+  exit 1
+fi
+
+readonly parent_command_with_args="$(ps -o args= $PPID)"
+
+echo "Running Docker Wrapped Shell" >&2
+
+docker run \
+  --rm \
+  -v "$(pwd):/dwsh" \
+  -w "/dwsh" \
+  -e DWSH_ENV="1" \
+  "$(env | cut -f1 -d= | sed 's/^/-e /')" \
+  $@ \
+  ${parent_command_with_args}
